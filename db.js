@@ -1,9 +1,18 @@
-const { Pool } = require('pg');
-const pgConnectionString = require('pg-connection-string');
+const mysql = require('mysql');
 
-const connectionString = 'postgres://car:Cs18@localhost:5432/cardb'; // Correctly formatted connection string
+const connection = mysql.createConnection({
+  host: 'localhost',
+  user: 'grafibook_api_automotora',
+  password: 'api_automotora_pass',
+  database: 'grafibook_api_automotora',
+});
 
-const pgPoolConfig = pgConnectionString.parse(connectionString);
-const pool = new Pool(pgPoolConfig);
+connection.connect((err) => {
+  if (err) {
+    console.error('Error connecting to MySQL database:', err);
+    return;
+  }
+  console.log('Connected to MySQL database');
+});
 
-module.exports = pool;
+module.exports = connection;
