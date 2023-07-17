@@ -1,45 +1,68 @@
 const pool = require('./db');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
-async function getUsers(req, res) {
+const secretKey = process.env.JWT_SECRET || 'Q6Yj6NNNDcdGHfm5JcXXwHGSRJRfXKHhTTUABh6c7vk';
+
+async function getUsers() {
   try {
-    // Fetch users from the database
-    const { rows } = await pool.query('SELECT * FROM users');
-    res.status(200).json(rows);
+    const query = 'SELECT * FROM users';
+    const [rows] = await pool.query(query);
+    return rows;
   } catch (error) {
-    res.status(500).json({ message: 'Internal Server Error' });
+    throw error;
   }
 }
 
-async function loginUser(req, res) {
+async function getUserByUsername(username) {
   try {
-    // User login
-    const { username, password } = req.body;
+   const query = 'SELECT * FROM users WHERE username = ?';
+  const [rows] = await pool.query(query, [username]);
+  return rows;
+  } catch (error) {
+    throw error;
+  }
 
-    // Check if the user exists in the database and verify the password
-    const { rows } = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+}
 
-    if (rows.length === 0) {
-      // User not found
-      res.status(401).json({ message: 'Invalid username or password' });
-    } else {
-      const user = rows[0];
+async function createUser(user) {
+  const { username, password } = user;
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const query = 'INSERT INTO users (username, password) VALUES (?, ?)';
+  await pool.query(query, [username, hashedPassword]);
+}
 
-      if (user.password === password) {
-        // Successful login
-        const token = jwt.generateToken(user); // Generate a JWT token
-        res.status(200).json({ message: 'Login successful', token });
-      } else {
-        // Incorrect password
-        res.status(401).json({ message: 'Invalid username or password' });
-      }
+async function loginUser(username, password) {
+  try {
+    const user = await getUserByUsername(username);
+
+    if (!user) {
+      return { error: 'User not found' };
     }
+
+    if (user.password !== password) {
+      return { error: 'Incorrect password' };
+    }
+
+    const payload = {
+      id: user.id,
+      username: user.username,
+      // Add any additional user information you want to include in the token
+    };
+
+    const token = jwt.sign(payload, secretKey, { expiresIn: '1h' });
+
+    return { token };
   } catch (error) {
-    res.status(500).json({ message: 'Internal Server Error' });
+    throw error;
   }
 }
+
 
 module.exports = {
   getUsers,
+  getUserByUsername,
+  createUser,
   loginUser,
 };
+

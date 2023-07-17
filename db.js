@@ -1,9 +1,39 @@
-const { Pool } = require('pg');
-const pgConnectionString = require('pg-connection-string');
+const mysql = require('mysql');
 
-const connectionString = 'postgres://car:Cs18@localhost:5432/cardb'; // Correctly formatted connection string
+const pool = mysql.createPool({
+  host: 'localhost',
+  user: 'grafibook_api_automotora',
+  password: 'api_automotora_pass',
+  database: 'grafibook_api_automotora',
+});
 
-const pgPoolConfig = pgConnectionString.parse(connectionString);
-const pool = new Pool(pgPoolConfig);
+function getConnection() {
+  return new Promise((resolve, reject) => {
+    pool.getConnection((err, connection) => {
+      if (err) {
+        console.error('Error getting database connection:', err);
+        reject(err);
+      } else {
+        resolve(connection);
+      }
+    });
+  });
+}
 
-module.exports = pool;
+function query(queryString, values) {
+  return new Promise((resolve, reject) => {
+    pool.query(queryString, values, (error, results, fields) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(results);
+      }
+    });
+  });
+}
+
+module.exports = {
+  getConnection,
+  query,
+};
+

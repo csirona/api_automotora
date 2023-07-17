@@ -28,17 +28,22 @@ async function getCarById(id) {
 
 async function createCar(car) {
   const { make, model, year, price, image, color, engine, kms, combustible, description } = car;
-  const query = 'INSERT INTO car_stock (make, model, year, price, image, color, engine, kms, combustible, description) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *, image AS "imageURL"';
+  const query = `INSERT INTO car_stock (make, model, year, price, image, color, engine, kms, combustible, 
+description) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   const values = [make, model, year, price, image || null, color, engine, kms, combustible, description];
 
   try {
-    const { rows } = await db.query(query, values);
-    return rows[0];
+    const { insertId } = await db.query(query, values);
+    const createdCar = await getCarById(insertId);
+    return createdCar;
   } catch (error) {
     console.error('Error creating car:', error);
     throw error;
   }
 }
+
+
 
 async function updateCar(id, car) {
   const { make, model, year, price, color, engine, kms, combustible, description } = car;
