@@ -1,18 +1,42 @@
-const mysql = require('mysql');
+const { Pool } = require('pg');
 
-const connection = mysql.createConnection({
+const pool = new Pool({
+  user: 'car',
+  password: 'Cs18',
   host: 'localhost',
-  user: 'grafibook_api_automotora',
-  password: 'api_automotora_pass',
-  database: 'grafibook_api_automotora',
+  database: 'cardb',
+  port: 5432, // Change the port if necessary
+  jsonb: true, // Add this line to enable JSONB support
+
 });
 
-connection.connect((err) => {
-  if (err) {
-    console.error('Error connecting to MySQL database:', err);
-    return;
-  }
-  console.log('Connected to MySQL database');
-});
+function getConnection() {
+  return new Promise((resolve, reject) => {
+    pool.getConnection((err, connection) => {
+      if (err) {
+        console.error('Error getting database connection:', err);
+        reject(err);
+      } else {
+        resolve(connection);
+      }
+    });
+  });
+}
 
-module.exports = connection;
+function query(queryString, values) {
+  return new Promise((resolve, reject) => {
+    const clonedValues = Array.isArray(values) ? [...values] : values;
+    pool.query(queryString, clonedValues, (error, results, fields) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(results);
+      }
+    });
+  });
+}
+
+module.exports = {
+  getConnection,
+  query,
+};

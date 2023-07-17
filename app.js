@@ -4,6 +4,7 @@ const multer = require('multer');
 const carController = require('./carController');
 const productController = require('./productController');
 const userController = require('./userController');
+const serviceController = require('./serviceController');
 const cors = require('cors');
 const path = require('path');
 
@@ -213,9 +214,106 @@ app.delete('/api/product-stock/:id', async (req, res) => {
 });
 
 // User API routes
-app.get('/api/users', userController.getUsers);
+app.get('/api/users/:username', async (req, res) => {
+  const { username } = req.params;
 
-app.post('/api/login', userController.loginUser);
+  try {
+    const user = await userController.getUserByUsername(username);
+
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+    } else {
+      res.status(200).json(user);
+    }
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    const result = await userController.loginUser(username, password);
+    if (result.error) {
+      res.status(401).json({ message: 'Authentication failed' });
+    } else {
+      res.status(200).json(result);
+      
+    }
+  } catch (error) {
+    console.error('Error during login:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+
+//Services
+app.get('/api/services', async (req, res) => {
+  try {
+    const services = await serviceController.getAllServices();
+    res.status(200).json(services);
+  } catch (error) {
+    console.error('Error fetching service data:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+app.get('/api/services/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const service = await serviceController.getServiceById(id);
+
+    if (!service) {
+      res.status(404).json({ message: 'Service not found' });
+    } else {
+      res.status(200).json(service);
+    }
+  } catch (error) {
+    console.error('Error fetching service data:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+app.post('/api/services', async (req, res) => {
+  const { name, description, price } = req.body;
+
+  try {
+    const serviceId = await serviceController.createService({ name, description, price });
+    res.status(201).json({ id: serviceId, name, description, price });
+  } catch (error) {
+    console.error('Error creating service:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+app.put('/api/services/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, description, price } = req.body;
+
+  try {
+    await serviceController.updateService(id, { name, description, price });
+    res.status(200).json({ id, name, description, price });
+  } catch (error) {
+    console.error('Error updating service:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+app.delete('/api/services/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await serviceController.deleteService(id);
+    res.status(200).json({ message: 'Service deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting service:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
 
 // Start the server
 app.listen(port, () => {
