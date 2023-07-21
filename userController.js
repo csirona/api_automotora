@@ -7,7 +7,7 @@ const secretKey = process.env.JWT_SECRET || 'Q6Yj6NNNDcdGHfm5JcXXwHGSRJRfXKHhTTU
 async function getUsers() {
   try {
     const query = 'SELECT * FROM users';
-    const [rows] = await pool.query(query);
+    const  rows  = await pool.query(query);
     return rows;
   } catch (error) {
     throw error;
@@ -16,13 +16,12 @@ async function getUsers() {
 
 async function getUserByUsername(username) {
   try {
-   const query = 'SELECT * FROM users WHERE username = ?';
-  const [rows] = await pool.query(query, [username]);
-  return rows;
+    const query = 'SELECT * FROM users WHERE username = ?';
+    const  rows  = await pool.query(query, [username]);
+    return rows[0];
   } catch (error) {
     throw error;
   }
-
 }
 
 async function createUser(user) {
@@ -35,12 +34,15 @@ async function createUser(user) {
 async function loginUser(username, password) {
   try {
     const user = await getUserByUsername(username);
-
     if (!user) {
       return { error: 'User not found' };
     }
 
-    if (user.password !== password) {
+    //const passwordMatch = await bcrypt.compare(password, user.password);
+     // Perform the password comparison without using bcrypt
+     const passwordMatch = password === user.password;
+
+    if (!passwordMatch) {
       return { error: 'Incorrect password' };
     }
 
@@ -57,7 +59,6 @@ async function loginUser(username, password) {
     throw error;
   }
 }
-
 
 module.exports = {
   getUsers,

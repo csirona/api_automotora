@@ -5,7 +5,7 @@ async function getAllCars() {
   const query = 'SELECT * FROM car_stock';
 
   try {
-    const { rows } = await db.query(query);
+    const  rows  = await db.query(query);
     return rows;
   } catch (error) {
     console.error('Error getting cars:', error);
@@ -14,11 +14,11 @@ async function getAllCars() {
 }
 
 async function getCarById(id) {
-  const query = 'SELECT * FROM car_stock WHERE id = $1';
+  const query = 'SELECT * FROM car_stock WHERE id = ?';
   const values = [id];
 
   try {
-    const { rows } = await db.query(query, values);
+    const rows  = await db.query(query, values);
     return rows[0];
   } catch (error) {
     console.error('Error getting car by ID:', error);
@@ -27,16 +27,18 @@ async function getCarById(id) {
 }
 
 async function createCar(car) {
-  const { make, model, year, price, image, color, engine, kms, combustible, description } = car;
-  const query = `INSERT INTO car_stock (make, model, year, price, image, color, engine, kms, combustible, 
-description) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-  const values = [make, model, year, price, image || null, color, engine, kms, combustible, description];
+  const { make, model, year, price, image, color, engine, kms, combustible, description, additional_images } = car;
+  const query = 'INSERT INTO car_stock (make, model, year, price, image, color, engine, kms, combustible, description, additional_images) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+  const values = [make, model, year, price, image || null, color, engine, kms, combustible, description, additional_images];
 
   try {
-    const { insertId } = await db.query(query, values);
-    const createdCar = await getCarById(insertId);
-    return createdCar;
+    // Insert the car into the database
+    await db.query(query, values);
+
+    // Fetch the newly inserted car by its ID
+    const insertedCarQuery = 'SELECT * FROM car_stock ORDER BY id DESC LIMIT 1';
+    const rows = await db.query(insertedCarQuery);
+    return rows[0];
   } catch (error) {
     console.error('Error creating car:', error);
     throw error;
@@ -47,7 +49,7 @@ description)
 
 async function updateCar(id, car) {
   const { make, model, year, price, color, engine, kms, combustible, description } = car;
-  const query = 'UPDATE car_stock SET make = $1, model = $2, year = $3, price = $4, color = $5, engine = $6, kms = $7, combustible = $8, description = $9 WHERE id = $10 RETURNING *';
+  const query = 'UPDATE car_stock SET make = ?, model = ?, year = ?, price = ?, color = ?, engine = ?, kms = ?,combustible = ?, description = ? WHERE id = ? RETURNING *';
   const values = [make, model, year, price, color, engine, kms, combustible, description, id];
 
   try {
@@ -60,7 +62,7 @@ async function updateCar(id, car) {
 }
 
 async function deleteCar(id) {
-  const query = 'DELETE FROM car_stock WHERE id = $1';
+  const query = 'DELETE FROM car_stock WHERE id = ?';
   const values = [id];
 
   try {
@@ -79,3 +81,4 @@ module.exports = {
   updateCar,
   deleteCar,
 };
+

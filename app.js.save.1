@@ -21,23 +21,30 @@ const port = 3002; // Choose an appropriate port number
 app.use(cors());
 
 // Middleware
-// Middleware for uploading sales images
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-const storage_sales = multer.diskStorage({
+// Serve static files from the "public" directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Configure Multer for handling file uploads
+const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, 'public', 'images', 'sales')); // Provide the correct absolute path
+    cb(null, path.join(__dirname, 'public', 'images', 'cars')); // Provide the correct absolute path
   },
   filename: function (req, file, cb) {
     cb(null, Date.now() + '-' + file.originalname); // Set the desired file name
   },
 });
 
-
-// Middleware for uploading the sales image (only one image)
-const uploadSalesImage = multer({
-  storage: storage_sales,
-}).single('image');
-
+const additionalImagesStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, 'public', 'images', 'additional'));
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname);
+  },
+});
 
 const storage_products = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -47,16 +54,6 @@ const storage_products = multer.diskStorage({
     cb(null, Date.now() + '-' + file.originalname); // Set the desired file name
   },
 });
-
-// Middleware
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-// Middleware for parsing JSON data in the request body
-app.use(express.json());
-
-// Serve static files from the "public" directory
-app.use(express.static(path.join(__dirname, 'public')));
-
 // File filter function for additional images
 const fileFilterAdditionalImages = (req, file, cb) => {
   if (
@@ -72,100 +69,12 @@ const fileFilterAdditionalImages = (req, file, cb) => {
   }
 };
 
-// Set storage for the main image
-const mainImageStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, './public/images/cars/main'); 
-  },
-  filename: function (req, file, cb) {
-    cb(null, 'main_' + Date.now() + path.extname(file.originalname));
-  },
-});
-
-// Set storage for additional images
-const additionalImageStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, './public/images/cars/additional');
-  },
-  filename: function (req, file, cb) {
-    cb(null, 'additional_' + Date.now() + path.extname(file.originalname));
-  },
-});
-
-
-// Middleware for uploading the main image (only one image)
-const uploadMainImage = multer({
-  storage: mainImageStorage,
-}).single('image');
-
-// Middleware for uploading additional images
-const uploadAdditionalImages = multer({
-  storage: additionalImageStorage,
-}).array('additional_images', 5);
-
-
-// Route to post a new car with images
-app.post('/api/car-stock', (req, res) => {
-  uploadMainImage(req, res, async (err) => {
-    if (err instanceof multer.MulterError) {
-      // A Multer error occurred when uploading the main image
-      return res.status(500).json({ error: err });
-    } else if (err) {
-      // An unknown error occurred when uploading the main image
-      return res.status(500).json({ error: 'Server error' });
-    }
-
-    // Main image upload was successful, proceed to upload additional images
-    uploadAdditionalImages(req, res, async (err) => {
-      if (err instanceof multer.MulterError) {
-        // A Multer error occurred when uploading additional images
-        return res.status(500).json({ error: 'Error uploading additional images' });
-      } else if (err) {
-        // An unknown error occurred when uploading additional images
-        return res.status(500).json({ error: 'Server error' });
-      }
-
-      try {
-        // Now, handle the rest of the form data and save the car to the database
-        const { make, model, year, price, color, engine, kms, combustible, description } = req.body;
-        const image = req.file ? req.file.path : null; // Main image path
-
-        // Additional images are now available in req.files
-        let additionalImages = [];
-        if (req.files && req.files.length > 0) {
-          additionalImages = req.files.map((file) => file.path);
-        }
-
-        const car = {
-          make,
-          model,
-          year,
-          price,
-          color,
-          engine,
-          kms,
-          combustible,
-          description,
-          image, // Add the main image path to the car object
-          additionalImages, // Add the additional image paths to the car object
-        };
-
-        // Save the new car data to the database
-        const savedCar = await carController.createCar(car);
-
-        res.status(201).json(savedCar);
-      } catch (error) {
-        console.log('Error creating car:', error);
-        res.status(500).json({ error: 'Server error' });
-      }
-    });
-  });
-});
-
-
+const upload = multer({ storage });
 const upload_products = multer({ storage: storage_products });
-const upload_sales = multer({ storage: storage_sales });
-
+const uploadAdditionalImages = multer({
+  storage: additionalImagesStorage,
+  fileFilter: fileFilterAdditionalImages, // Use the file filter for additional images
+}).array('additionalImages');
 
 // Test route
 app.get('/test', (req, res) => {
@@ -194,15 +103,38 @@ app.get('/api/car-stock/:id', async (req, res) => {
     } else {
       res.status(200).json(car);
     }
-    } catch (error) {
+  } catch (error) {
     console.error('Error fetching car data:', error);
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
 
+// Handle the car creation route with image upload
+app.post('/api/car-stock', upload.single('image'), async (req, res) => {
+  const { make, model, year, price, color, engine, kms, combustible, description } = req.body;
 
+  try {
+    // Here, you can save the image URL or key to your database
+    const imageURL = req.file ? req.file.path : null; // Example: save the image path as URL
 
-
+    const car = await carController.createCar({
+      make,
+      model,
+      year,
+      price,
+      image: imageURL,
+      color,
+      engine,
+      kms,
+      combustible,
+      description,
+    });
+    res.status(201).json(car);
+  } catch (error) {
+    console.error('Error creating car:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
 
 app.put('/api/car-stock/:id', async (req, res) => {
   const { id } = req.params;
@@ -429,13 +361,12 @@ app.get('/api/sales', async (req, res) => {
   }
 });
 
-app.post('/api/sales',upload_sales.single('image'),  async (req, res) => {
-  const { title, description, price } = req.body;
-  const image = req.file ? req.file.path : null; // Set the image path if it exists
+app.post('/api/sales', async (req, res) => {
+  const { id, image, title, description, price } = req.body;
 
   try {
     // Create a new sale record in the database
-    const newSale = await salesController.createSale({ image, title, description, price });
+    const newSale = await salesController.createSale({ id, image, title, description, price });
     res.status(201).json(newSale);
   } catch (error) {
     console.error('Error creating sale:', error);
@@ -443,58 +374,42 @@ app.post('/api/sales',upload_sales.single('image'),  async (req, res) => {
   }
 });
 
-
-// Route to delete a sale by ID
-app.delete('/api/sales/:id', async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    // Call the deleteSale function from the salesController to delete the sale record
-    await salesController.deleteSale(id);
-    res.status(200).json({ message: 'Sale deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting sale:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
-  }
-});
-
-
+// Private key and certificate as text
 const privateKey = `-----BEGIN EC PRIVATE KEY-----
-MIGkAgEBBDBGLFx3aElziaT+sOk+/F5DZ//FTaBtRkRjGrTi1uxIw4Hs0RYBCrOi
-weF6qc+lZXugBwYFK4EEACKhZANiAATJgKUl6QIyASPF5T5U6jR2q5kgSCiTkO98
-wUeRJgWUyJVCXrn+RJZ/GEoqOIqEf78eWlITRP/uZFiAyvC04ksn1LxyBp/e6/Ks
-4/AyYdU9+FZuYIotCfUwz8LexfC/DT8=
+MIGkAgEBBDApL0AtSvkHHJGagf3l8dDP4nHZPL0YsstWQ/a1eQrN++KGXsEfTvPc
+TgrVz29WemugBwYFK4EEACKhZANiAARXPPTrqRLoansZCLUwPJNE6gBuWt24N7fg
+cFe9ecK8y6TVr/GVVlNhIqoe3Kxf3dC8PWOX1zbb27DRObBIWAmYY6dKEiR/Nxpo
+5fpBXDFw4iN5gWG5qGm+YDgjFcfqvKk=
 -----END EC PRIVATE KEY-----`;
 
 const certificate = `-----BEGIN CERTIFICATE-----
-MIIE1DCCA7ygAwIBAgISA6ZPK8pr8NBdmQekrh0ecuKfMA0GCSqGSIb3DQEBCwUA
+MIIE0jCCA7qgAwIBAgISBHnKwSg854aWxXTbrm0UdoXTMA0GCSqGSIb3DQEBCwUA
 MDIxCzAJBgNVBAYTAlVTMRYwFAYDVQQKEw1MZXQncyBFbmNyeXB0MQswCQYDVQQD
-EwJSMzAeFw0yMzA3MjEwMTQyMDdaFw0yMzEwMTkwMTQyMDZaMBcxFTATBgNVBAMT
-DGdyYWZpYm9vay5jbDB2MBAGByqGSM49AgEGBSuBBAAiA2IABMmApSXpAjIBI8Xl
-PlTqNHarmSBIKJOQ73zBR5EmBZTIlUJeuf5Eln8YSio4ioR/vx5aUhNE/+5kWIDK
-8LTiSyfUvHIGn97r8qzj8DJh1T34Vm5gii0J9TDPwt7F8L8NP6OCAqswggKnMA4G
+EwJSMzAeFw0yMzA3MTQwMzIxNDlaFw0yMzEwMTIwMzIxNDhaMBcxFTATBgNVBAMT
+DGdyYWZpYm9vay5jbDB2MBAGByqGSM49AgEGBSuBBAAiA2IABFc89OupEuhqexkI
+tTA8k0TqAG5a3bg3t+BwV715wrzLpNWv8ZVWU2Eiqh7crF/d0Lw9Y5fXNtvbsNE5
+sEhYCZhjp0oSJH83Gmjl+kFcMXDiI3mBYbmoab5gOCMVx+q8qaOCAqkwggKlMA4G
 A1UdDwEB/wQEAwIHgDAdBgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwDAYD
-VR0TAQH/BAIwADAdBgNVHQ4EFgQUgeTVDQhWItrtK8mn0YuR7VhBRsUwHwYDVR0j
+VR0TAQH/BAIwADAdBgNVHQ4EFgQUiNz/HB5Ip/OkOwiZCt6I4mFdaWswHwYDVR0j
 BBgwFoAUFC6zF7dYVsuuUAlA5h+vnYsUwsYwVQYIKwYBBQUHAQEESTBHMCEGCCsG
 AQUFBzABhhVodHRwOi8vcjMuby5sZW5jci5vcmcwIgYIKwYBBQUHMAKGFmh0dHA6
 Ly9yMy5pLmxlbmNyLm9yZy8wgbEGA1UdEQSBqTCBpoIaYXBpYXV0b21vdG9yYS5n
 cmFmaWJvb2suY2yCEGZ0cC5ncmFmaWJvb2suY2yCDGdyYWZpYm9vay5jbIIRbWFp
 bC5ncmFmaWJvb2suY2yCEHBvcC5ncmFmaWJvb2suY2yCEXNtdHAuZ3JhZmlib29r
 LmNsgh53d3cuYXBpYXV0b21vdG9yYS5ncmFmaWJvb2suY2yCEHd3dy5ncmFmaWJv
-b2suY2wwEwYDVR0gBAwwCjAIBgZngQwBAgEwggEGBgorBgEEAdZ5AgQCBIH3BIH0
-APIAdwB6MoxU2LcttiDqOOBSHumEFnAyE4VNO9IrwTpXo1LrUgAAAYl2U3OXAAAE
-AwBIMEYCIQCuRaN0MJ+LnfzqcUOtARTJ8ADaD/bsJ+zj6Z3XZ/yZPQIhANrV86oa
-uQlONUch8VuiJ11ryJ4CCWqvEWVHbV2TpemLAHcA6D7Q2j71BjUy51covIlryQPT
-y9ERa+zraeF3fW0GvW4AAAGJdlNzdQAABAMASDBGAiEA8cV/LZzs+dx++TqX83YX
-kzLqItgzik/cuL63H1fpQtACIQCWsVpYRKz8q+8f4Dyr53W5IAdcMwQBNcmFQesn
-O+U4CzANBgkqhkiG9w0BAQsFAAOCAQEAcHTGn82QBF3ZObBmt/YBldFlaELJ3v3j
-f0AupbMUPOofBWIH46/5TTkd0MTCTRNuc5U9EA89o1RIkwHtHldEik4qGKTCk/PD
-/IKbc5BF33mQbs1MW71mgzx0NAxCkMzc2jjQSJOQ3HdW1VKaRhAIIzJ/to5KrC0o
-rpZKo96ilnm/w0ePkueXngUd3V4T6pjJRCsLWZMN2o99JPpCBIwuUmXBHCsYdeJL
-9rmpffdtRTaSdM1pUzhJVCZ1RO5GDON4VafuA+LToVUO280Pkeiyxg4G1BykI7u8
-Db1yWM3iZxUkO3sVGX4UXW2/TocdDu7W4SVIuPA7nfB7odmHTKwq9g==
+b2suY2wwEwYDVR0gBAwwCjAIBgZngQwBAgEwggEEBgorBgEEAdZ5AgQCBIH1BIHy
+APAAdgC3Pvsk35xNunXyOcW6WPRsXfxCz3qfNcSeHQmBJe20mQAAAYlSojYGAAAE
+AwBHMEUCIFkYZEAw6T9eJzthJ8edeg6m36LgnxZ9BkACEYPYCfSHAiEA/BZhYlxr
+OstSuyVfGftHoDrFixje7TpUaRePCyXfTjoAdgB6MoxU2LcttiDqOOBSHumEFnAy
+E4VNO9IrwTpXo1LrUgAAAYlSojYYAAAEAwBHMEUCIQDsWoWoq+E6HWNvgEyCH5gN
+snHPkx3bYi9WA/FkaOT+hQIgBwCfFL4IeXb5iPXIjH0jrdt7Pt5E0rKwzuT4KU4k
+T98wDQYJKoZIhvcNAQELBQADggEBAIdNrpklNDFyIS7cntRacso4aac8fsAP3TvP
+wFR1q2y6/NN/7LQD/gM0hTgysmUvFWXHSV+hWUxV/nVDlLY8lrygqsbCNXBzJb4b
+bKD2X9L8SD9DhE+2ioz96DMYbdQ8mq7oLqDWxpy7OhnY6LMeQfDiM+QSp/aJnHJc
+vFoumOobr9bMP5e2P5T+c5QExI6shPo7bM+rbDoWhzGjT0h9PgtcBNE6Psdjz/ss
+0vPZMMq7JzcXvo3Xlpii4+C0hBT28KIPrnatR/8jR8fzddrmjONIqE/WGQqdBJYz
+Ovzi3ViX5Hip/P33zTE64mf8U8q6r5OzZQtg2sfM5bLFBTrp4WE=
 -----END CERTIFICATE-----`;
-
 
 // Create HTTPS server
 const credentials = { key: privateKey, cert: certificate };
@@ -507,65 +422,15 @@ httpsServer.listen(port, () => {
 });
 
 
-const sgMail = require('@sendgrid/mail');
-sgMail.setApiKey('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');
-
-// Add this route to handle the POST request
-app.post('/api/send-email', (req, res) => {
-    const { to, subject, text, html } = req.body;
-
-  // Validate that the "to" field is provided and not empty
-  if (!to) {
-    return res.status(400).json({ error: '"to" field is required' });
-  }
-
-  // Email data
-  const msg = {
-    to, // Replace with the recipient's email address, provided in the POST request
-    from: 'messagemarweg@gmail.com', // Replace with the sender's email address
-    subject,
-    text,
-    html,
-  };
-
-  // Send the email
-  sgMail
-    .send(msg)
-    .then(() => {
-      console.log('Email sent');
-      res.status(200).json({ message: 'Email sent successfully' });
-    })
-    .catch((error) => {
-      console.error(error);
-      res.status(500).json({ error: 'Failed to send email' });
-    });
+// Configure Nodemailer transporter
+const transporter = nodemailer.createTransport({
+  host: 'smtp.gmail.com', // e.g., 'Gmail', 'Outlook', etc.
+  port: 465,
+  secure: true,
+  auth: {
+    user: 'messagemarweg@gmail.com',
+    pass: 'messagemarwegpass',
+  },
 });
 
-
-// Create a Nodemailer transporter using SMTP
-//const transporter = nodemailer.createTransport({
-//  host: 'grafibook.cl',
-//  port: 587,
-// secure: true, // Set to true if you want to use SSL 
-// auth: {
- //   user: 'message@grafibook.cl',
-//    pass: 'messagemarwegpass',
-//  }
-//});
-
-// Email data
-//const mailOptions = {
-//  from: 'message@grafibook.cl',
-//  to: 'cristianosvar@gmail.com',
-//  subject: 'Test Email',
-//  text: 'This is a test email sent from Nodemailer with SMTP.',
-//};
-
-// Send the email
-//transporter.sendMail(mailOptions, (error, info) => {
-//  if (error) {
-//    console.error('Error sending email:', error);
-//  } else {
-//    console.log('Email sent:', info.response);
-//  }
-//});
+// Route to handle form su

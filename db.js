@@ -1,39 +1,27 @@
-const mysql = require('mysql');
+const mysql = require('mysql2/promise');
 
 const pool = mysql.createPool({
   host: 'localhost',
   user: 'grafibook_api_automotora',
   password: 'api_automotora_pass',
   database: 'grafibook_api_automotora',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
 });
 
-function getConnection() {
-  return new Promise((resolve, reject) => {
-    pool.getConnection((err, connection) => {
-      if (err) {
-        console.error('Error getting database connection:', err);
-        reject(err);
-      } else {
-        resolve(connection);
-      }
-    });
-  });
-}
-
-function query(queryString, values) {
-  return new Promise((resolve, reject) => {
-    pool.query(queryString, values, (error, results, fields) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(results);
-      }
-    });
-  });
+async function query(queryString, values) {
+  try {
+    const connection = await pool.getConnection();
+    const [results] = await connection.query(queryString, values);
+    connection.release();
+    return results;
+  } catch (error) {
+    throw error;
+  }
 }
 
 module.exports = {
-  getConnection,
   query,
 };
 

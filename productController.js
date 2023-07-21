@@ -11,24 +11,14 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 async function getProductById(id) {
-  try {
-    const query = 'SELECT * FROM product_stock WHERE id = ?';
-    const [rows] = await pool.query(query, id);
-    return rows;
-  } catch (error) {
-    throw error;
-  }
+  const query = 'SELECT * FROM product_stock WHERE id = ?';
+  const  rows = await pool.query(query, [id]);
+  return rows[0];
 }
 
-
 async function getAllProducts() {
-  try {
-    const query = 'SELECT * FROM product_stock';
-    const [rows] = await pool.query(query);
-    return rows;
-  } catch (error) {
-    throw error;
-  }
+  const rows = await pool.query('SELECT * FROM product_stock');
+  return rows;
 }
 
 async function createProduct(product) {
@@ -38,7 +28,7 @@ async function createProduct(product) {
     VALUES (?, ?, ?, ?)
   `;
   await pool.query(query, [name, description, price, product.image]);
-
+  
   // Add the return statement
   return;
 }
