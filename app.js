@@ -7,15 +7,18 @@ const carController = require('./carController');
 const productController = require('./productController');
 const userController = require('./userController');
 const serviceController = require('./serviceController');
+const aboutusController = require('./aboutusController');
+const teamController = require('./teamController');
 const cors = require('cors');
 const path = require('path');
 const salesController = require('./salesController');
 
 const nodemailer = require('nodemailer');
 
+require('dotenv').config(); // Load environment variables from .env file
 
 const app = express();
-const port = 3002; // Choose an appropriate port number
+const port = 3006; // Choose an appropriate port number
 
 // Enable CORS
 app.use(cors());
@@ -72,15 +75,6 @@ const fileFilterAdditionalImages = (req, file, cb) => {
   }
 };
 
-// Set storage for the main image
-const mainImageStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, './public/images/cars/main'); 
-  },
-  filename: function (req, file, cb) {
-    cb(null, 'main_' + Date.now() + path.extname(file.originalname));
-  },
-});
 
 // Set storage for additional images
 const additionalImageStorage = multer.diskStorage({
@@ -93,49 +87,37 @@ const additionalImageStorage = multer.diskStorage({
 });
 
 
-// Middleware for uploading the main image (only one image)
-const uploadMainImage = multer({
-  storage: mainImageStorage,
-}).single('image');
 
 // Middleware for uploading additional images
 const uploadAdditionalImages = multer({
   storage: additionalImageStorage,
-}).array('additional_images', 5);
+}).array('additional_images', 10);
 
 
 // Route to post a new car with images
 app.post('/api/car-stock', (req, res) => {
-  uploadMainImage(req, res, async (err) => {
-    if (err instanceof multer.MulterError) {
-      // A Multer error occurred when uploading the main image
-      return res.status(500).json({ error: err });
-    } else if (err) {
-      // An unknown error occurred when uploading the main image
-      return res.status(500).json({ error: 'Server error' });
-    }
-
-    // Main image upload was successful, proceed to upload additional images
+  
     uploadAdditionalImages(req, res, async (err) => {
       if (err instanceof multer.MulterError) {
         // A Multer error occurred when uploading additional images
-        return res.status(500).json({ error: 'Error uploading additional images' });
+        return res.status(500).json({ error: 'A Multer error occurred when uploading additional images' });
       } else if (err) {
         // An unknown error occurred when uploading additional images
-        return res.status(500).json({ error: 'Server error' });
+        return res.status(500).json({ error: 'n unknown error occurred when uploading additional images'});
       }
 
       try {
         // Now, handle the rest of the form data and save the car to the database
         const { make, model, year, price, color, engine, kms, combustible, description } = req.body;
-        const image = req.file ? req.file.path : null; // Main image path
 
-        // Additional images are now available in req.files
-        let additionalImages = [];
-        if (req.files && req.files.length > 0) {
-          additionalImages = req.files.map((file) => file.path);
-        }
+        // Console log to check req.files array
+      console.log(req.files);
 
+    // Additional images are now available in req.files
+    let additionalImages = [];
+    if (req.files && req.files.length > 0) {
+      additionalImages = req.files.map((file) => file.path);
+    }
         const car = {
           make,
           model,
@@ -146,7 +128,6 @@ app.post('/api/car-stock', (req, res) => {
           kms,
           combustible,
           description,
-          image, // Add the main image path to the car object
           additionalImages, // Add the additional image paths to the car object
         };
 
@@ -156,9 +137,9 @@ app.post('/api/car-stock', (req, res) => {
         res.status(201).json(savedCar);
       } catch (error) {
         console.log('Error creating car:', error);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ error: error });
       }
-    });
+   
   });
 });
 
@@ -430,13 +411,16 @@ app.get('/api/sales', async (req, res) => {
 });
 
 app.post('/api/sales',upload_sales.single('image'),  async (req, res) => {
+  console.log(req.body);
+  console.log(req.file);
+
   const { title, description, price } = req.body;
   const image = req.file ? req.file.path : null; // Set the image path if it exists
 
   try {
     // Create a new sale record in the database
-    const newSale = await salesController.createSale({ image, title, description, price });
-    res.status(201).json(newSale);
+    const sale = await salesController.createSale({ image, title, description, price });
+    res.status(201).json(sale);
   } catch (error) {
     console.error('Error creating sale:', error);
     res.status(500).json({ message: 'Internal Server Error' });
@@ -459,41 +443,141 @@ app.delete('/api/sales/:id', async (req, res) => {
 });
 
 
+// About Us API routes
+app.get('/api/aboutus', async (req, res) => {
+  try {
+    const aboutUsData = await aboutusController.getAboutUs();
+    res.status(200).json(aboutUsData);
+  } catch (error) {
+    console.error('Error fetching About Us data:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+app.post('/api/aboutus', async (req, res) => {
+  const { title, first_text, subtitle, second_text } = req.body;
+
+  try {
+    const aboutUsId = await aboutusController.createAboutUs({
+      title,
+      first_text,
+      subtitle,
+      second_text,
+    });
+    res.status(201).json({ aboutUsId });
+  } catch (error) {
+    console.error('Error creating About Us data:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+app.put('/api/aboutus/:id', async (req, res) => {
+  const { id } = req.params;
+  const { title, first_text, subtitle, second_text } = req.body;
+
+  try {
+    await aboutusController.updateAboutUs({
+      id,
+      title,
+      first_text,
+      subtitle,
+      second_text
+    });
+    res.status(200).json({ id, title, first_text, subtitle, second_text });
+  } catch (error) {
+    console.error('Error updating About Us data:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+
+// Team API routes
+app.get('/api/team', async (req, res) => {
+  try {
+    const teamMembers = await teamController.getTeamMembers();
+    res.status(200).json(teamMembers);
+  } catch (error) {
+    console.error('Error fetching Team data:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+app.post('/api/team', async (req, res) => {
+  const { name, position } = req.body;
+
+  try {
+    const memberId = await teamController.createTeamMember({ name, position });
+    res.status(201).json({ id: memberId, name, position });
+  } catch (error) {
+    console.error('Error creating Team data:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+app.put('/api/team/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, position } = req.body;
+
+  try {
+    await teamController.updateTeamMember({ id, name, position });
+    res.status(200).json({ id, name, position });
+  } catch (error) {
+    console.error('Error updating Team data:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+app.delete('/api/team/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await teamController.deleteTeamMember(id);
+    res.status(200).json({ message: 'Team member deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting Team data:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+
 const privateKey = `-----BEGIN EC PRIVATE KEY-----
-MIGkAgEBBDBGLFx3aElziaT+sOk+/F5DZ//FTaBtRkRjGrTi1uxIw4Hs0RYBCrOi
-weF6qc+lZXugBwYFK4EEACKhZANiAATJgKUl6QIyASPF5T5U6jR2q5kgSCiTkO98
-wUeRJgWUyJVCXrn+RJZ/GEoqOIqEf78eWlITRP/uZFiAyvC04ksn1LxyBp/e6/Ks
-4/AyYdU9+FZuYIotCfUwz8LexfC/DT8=
------END EC PRIVATE KEY-----`;
+MIGkAgEBBDDxNjWbPF9DiakV9sjUysuTPyJzSRnXhDLYU9pzlhB/Vawb9RcfockR
+RP0bJrQW9Y6gBwYFK4EEACKhZANiAATvF2TEzLQ6tyWxu8Jpr8BYk+5v2pq90w1n
+P31cQHrw2dfChZDdsWfceaZyGzx2epRCLwUedCpdVdb/OiNdlPbOcpR8XxaHfpS3
+Ug+9cOjlOuHwEbDJwJuF8VMI3b7Om0w=
+-----END EC PRIVATE KEY-----
+`;
 
 const certificate = `-----BEGIN CERTIFICATE-----
-MIIE1DCCA7ygAwIBAgISA6ZPK8pr8NBdmQekrh0ecuKfMA0GCSqGSIb3DQEBCwUA
+MIIE/TCCA+WgAwIBAgISBIhB8FeM/OV8wSNSb10abjZwMA0GCSqGSIb3DQEBCwUA
 MDIxCzAJBgNVBAYTAlVTMRYwFAYDVQQKEw1MZXQncyBFbmNyeXB0MQswCQYDVQQD
-EwJSMzAeFw0yMzA3MjEwMTQyMDdaFw0yMzEwMTkwMTQyMDZaMBcxFTATBgNVBAMT
-DGdyYWZpYm9vay5jbDB2MBAGByqGSM49AgEGBSuBBAAiA2IABMmApSXpAjIBI8Xl
-PlTqNHarmSBIKJOQ73zBR5EmBZTIlUJeuf5Eln8YSio4ioR/vx5aUhNE/+5kWIDK
-8LTiSyfUvHIGn97r8qzj8DJh1T34Vm5gii0J9TDPwt7F8L8NP6OCAqswggKnMA4G
+EwJSMzAeFw0yMzA3MjExMjQxMTJaFw0yMzEwMTkxMjQxMTFaMBcxFTATBgNVBAMT
+DGdyYWZpYm9vay5jbDB2MBAGByqGSM49AgEGBSuBBAAiA2IABO8XZMTMtDq3JbG7
+wmmvwFiT7m/amr3TDWc/fVxAevDZ18KFkN2xZ9x5pnIbPHZ6lEIvBR50Kl1V1v86
+I12U9s5ylHxfFod+lLdSD71w6OU64fARsMnAm4XxUwjdvs6bTKOCAtQwggLQMA4G
 A1UdDwEB/wQEAwIHgDAdBgNVHSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwDAYD
-VR0TAQH/BAIwADAdBgNVHQ4EFgQUgeTVDQhWItrtK8mn0YuR7VhBRsUwHwYDVR0j
+VR0TAQH/BAIwADAdBgNVHQ4EFgQUxZanfXJhGPiCI/DJVt0cZO+5ee0wHwYDVR0j
 BBgwFoAUFC6zF7dYVsuuUAlA5h+vnYsUwsYwVQYIKwYBBQUHAQEESTBHMCEGCCsG
 AQUFBzABhhVodHRwOi8vcjMuby5sZW5jci5vcmcwIgYIKwYBBQUHMAKGFmh0dHA6
-Ly9yMy5pLmxlbmNyLm9yZy8wgbEGA1UdEQSBqTCBpoIaYXBpYXV0b21vdG9yYS5n
+Ly9yMy5pLmxlbmNyLm9yZy8wgd0GA1UdEQSB1TCB0oIaYXBpYXV0b21vdG9yYS5n
 cmFmaWJvb2suY2yCEGZ0cC5ncmFmaWJvb2suY2yCDGdyYWZpYm9vay5jbIIRbWFp
 bC5ncmFmaWJvb2suY2yCEHBvcC5ncmFmaWJvb2suY2yCEXNtdHAuZ3JhZmlib29r
-LmNsgh53d3cuYXBpYXV0b21vdG9yYS5ncmFmaWJvb2suY2yCEHd3dy5ncmFmaWJv
-b2suY2wwEwYDVR0gBAwwCjAIBgZngQwBAgEwggEGBgorBgEEAdZ5AgQCBIH3BIH0
-APIAdwB6MoxU2LcttiDqOOBSHumEFnAyE4VNO9IrwTpXo1LrUgAAAYl2U3OXAAAE
-AwBIMEYCIQCuRaN0MJ+LnfzqcUOtARTJ8ADaD/bsJ+zj6Z3XZ/yZPQIhANrV86oa
-uQlONUch8VuiJ11ryJ4CCWqvEWVHbV2TpemLAHcA6D7Q2j71BjUy51covIlryQPT
-y9ERa+zraeF3fW0GvW4AAAGJdlNzdQAABAMASDBGAiEA8cV/LZzs+dx++TqX83YX
-kzLqItgzik/cuL63H1fpQtACIQCWsVpYRKz8q+8f4Dyr53W5IAdcMwQBNcmFQesn
-O+U4CzANBgkqhkiG9w0BAQsFAAOCAQEAcHTGn82QBF3ZObBmt/YBldFlaELJ3v3j
-f0AupbMUPOofBWIH46/5TTkd0MTCTRNuc5U9EA89o1RIkwHtHldEik4qGKTCk/PD
-/IKbc5BF33mQbs1MW71mgzx0NAxCkMzc2jjQSJOQ3HdW1VKaRhAIIzJ/to5KrC0o
-rpZKo96ilnm/w0ePkueXngUd3V4T6pjJRCsLWZMN2o99JPpCBIwuUmXBHCsYdeJL
-9rmpffdtRTaSdM1pUzhJVCZ1RO5GDON4VafuA+LToVUO280Pkeiyxg4G1BykI7u8
-Db1yWM3iZxUkO3sVGX4UXW2/TocdDu7W4SVIuPA7nfB7odmHTKwq9g==
------END CERTIFICATE-----`;
+LmNsghJzdG9jay5ncmFmaWJvb2suY2yCHnd3dy5hcGlhdXRvbW90b3JhLmdyYWZp
+Ym9vay5jbIIQd3d3LmdyYWZpYm9vay5jbIIWd3d3LnN0b2NrLmdyYWZpYm9vay5j
+bDATBgNVHSAEDDAKMAgGBmeBDAECATCCAQMGCisGAQQB1nkCBAIEgfQEgfEA7wB2
+ALc++yTfnE26dfI5xbpY9Gxd/ELPep81xJ4dCYEl7bSZAAABiXiu26IAAAQDAEcw
+RQIgOvc/5DTsrDP/PA81lkVn+KxNhXPFqXV0J/ZnS+NVvc8CIQDyr/ovHAv7Dm3/
+h4w777jZrwBQjPMlxXpTlRxnZ1XdlAB1AK33vvp8/xDIi509nB4+GGq0Zyldz7EM
+JMqFhjTr3IKKAAABiXiu29YAAAQDAEYwRAIgfFuYI/HNjwcchiYzGmIjMrp8J1wJ
+a2DPAbOjqAyQsS4CIDUp1fKNY9gjjNEV+R2pPFQj0KvBkPnLZguykbfa9tflMA0G
+CSqGSIb3DQEBCwUAA4IBAQAbewJsV4UONG2ELcFxeTIS25xBNEyCwMToeEReAip4
+lLtO6xP/2Xvt+3gkfmGyHGRokbaKiGjEgTHw7uAxId5PirLR11o/Frr16fx8B+TW
+bxRkDKusUvNZshPN86TY8RDW2OY1nZqBLxlEpqJgfvZOSgoJ50yqsO+nW5GBvrGn
+EVpyfl3j23Icyxu/rG3b6W+A6TWwX29Vy41p2OsRBOOzcbM3v6Awrik7xGy6fIYo
+EyhBjF7w6qR0BfvgN+baYmBFHdlkqaZg1l31aGGhZzP5fWG+88N6q9VcYkwaLy4m
+o2PqEbEIUNnELfgSYMgTaeDJGNNoX5i2AKB84yz1BEkX
+-----END CERTIFICATE-----
+`;
 
 
 // Create HTTPS server
@@ -508,7 +592,8 @@ httpsServer.listen(port, () => {
 
 
 const sgMail = require('@sendgrid/mail');
-sgMail.setApiKey('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');
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
 
 // Add this route to handle the POST request
 app.post('/api/send-email', (req, res) => {

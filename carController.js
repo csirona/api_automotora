@@ -27,18 +27,18 @@ async function getCarById(id) {
 }
 
 async function createCar(car) {
-  const { make, model, year, price, image, color, engine, kms, combustible, description, additional_images } = car;
-  const query = 'INSERT INTO car_stock (make, model, year, price, image, color, engine, kms, combustible, description, additional_images) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
-  const values = [make, model, year, price, image || null, color, engine, kms, combustible, description, additional_images];
+  const { make, model, year, price, color, engine, kms, combustible, description, additionalImages } = car;
+  const query = 'INSERT INTO car_stock (make, model, year, price, color, engine, kms, combustible, description, additional_images) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+  const values = [make, model, year, price, color, engine, kms, combustible, description, JSON.stringify(additionalImages)];
 
   try {
     // Insert the car into the database
     await db.query(query, values);
 
     // Fetch the newly inserted car by its ID
-    const insertedCarQuery = 'SELECT * FROM car_stock ORDER BY id DESC LIMIT 1';
-    const rows = await db.query(insertedCarQuery);
-    return rows[0];
+    //const insertedCarQuery = 'SELECT * FROM car_stock ORDER BY id DESC LIMIT 1';
+    //const rows = await db.query(insertedCarQuery);
+    return { message: 'Car created successfully' };
   } catch (error) {
     console.error('Error creating car:', error);
     throw error;

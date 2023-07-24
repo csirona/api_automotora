@@ -28,14 +28,13 @@ const getAllSales = async () => {
 // Function to create a new sales record in the database
 //const createSale = async (saleData) => {
   // Function to create a new sales record in the database
-async function createSale(saleData)  { 
+async function createSale(sale)  { 
     // Extract the properties from the saleData object
-    const { title, description, price } = saleData;
-    
+    const { title, description, price } = sale;
+    console.log(sale)
     // Perform a database query to insert the new sale record
-    const query = 'INSERT INTO sales ( image, title, description, price) VALUES ( ?, ?, ?,  ?)';
-    const values = [ saleData.image, title, description, price];
-    await db.query(query, values);
+    const query = 'INSERT INTO sales ( image, title, description, price) VALUES ( ?, ?, ?, ?)';
+    await db.query(query, [ sale.image, title, description, price]);
 
     // Return the newly created sale object
     return ;  
